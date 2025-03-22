@@ -13,6 +13,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(user_router.router)
 app.include_router(diary_router.router)
 
+
 @app.get("/")
 def read_root():
     return {"message": "FastAPI 서버가 실행 중입니다."}
