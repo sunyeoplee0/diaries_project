@@ -1,8 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Enum, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Enum, Boolean, Table
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
 import enum
-import pytz
 
 Base = declarative_base()
 
@@ -24,6 +23,24 @@ class User(Base):
 
     diaries = relationship("Diary", back_populates="owner", cascade="all, delete-orphan")
 
+# 일기-태그 다대다 관계 테이블
+diary_tag = Table(
+    "diary_tag",
+    Base.metadata,
+    Column("diary_id", Integer, ForeignKey("diaries.id"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True)
+)
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), nullable=False, unique=True)
+    category = Column(String(50), nullable=True)  # 취미, 고민거리, 생활습관 등의 카테고리
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    diaries = relationship("Diary", secondary=diary_tag, back_populates="tags")
+
 class Diary(Base):
     __tablename__ = "diaries"
 
@@ -36,11 +53,11 @@ class Diary(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     emotion = Column(String(50), nullable=True)
     image_url = Column(String(300), nullable=True)
-    shared = Column(Boolean, default=False)  # 추가
+    ai_comment = Column(Text, nullable=True)  # AI가 생성한 코멘트 저장
 
     owner = relationship("User", back_populates="diaries")
     status_tracking = relationship("DiaryStatus", back_populates="diary", uselist=False, cascade="all, delete-orphan")
-
+    tags = relationship("Tag", secondary=diary_tag, back_populates="diaries")
 
 class DiaryStatus(Base):
     __tablename__ = "diary_status"
@@ -51,42 +68,3 @@ class DiaryStatus(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     diary = relationship("Diary", back_populates="status_tracking")
-
-
-class Follow(Base):
-    __tablename__ = "follows"
-
-    id = Column(Integer, primary_key=True, index=True)
-    follower_id = Column(Integer, ForeignKey("users.id"))
-    following_id = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    follower = relationship("User", foreign_keys=[follower_id], backref="following")
-    following = relationship("User", foreign_keys=[following_id], backref="followers")
-
-
-class Like(Base):
-    __tablename__ = "likes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    diary_id = Column(Integer, ForeignKey("diaries.id", ondelete="CASCADE"))
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    diary = relationship("Diary", backref="likes")
-    user = relationship("User", backref="likes")
-
-
-class Comment(Base):
-    __tablename__ = "comments"
-
-    id = Column(Integer, primary_key=True, index=True)
-    content = Column(Text, nullable=False)
-    diary_id = Column(Integer, ForeignKey("diaries.id", ondelete="CASCADE"))
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    created_at = Column(DateTime, default=lambda: datetime.now(pytz.timezone('Asia/Seoul')))
-    updated_at = Column(DateTime, default=lambda: datetime.now(pytz.timezone('Asia/Seoul')),
-                        onupdate=lambda: datetime.now(pytz.timezone('Asia/Seoul')))
-
-    diary = relationship("Diary", backref="comments")
-    user = relationship("User", backref="comments")
